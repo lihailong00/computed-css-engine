@@ -1,6 +1,13 @@
 //! Computed Style Calculation
 
+use once_cell::sync::Lazy;
+use regex::Regex;
 use std::collections::HashMap;
+
+/// Precompiled regex for parsing rgb/rgba colors
+static RGB_REGEX: Lazy<Regex> = Lazy::new(|| {
+    Regex::new(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)").unwrap()
+});
 
 /// A computed property value with its type
 #[derive(Debug, Clone)]
@@ -188,8 +195,7 @@ fn normalize_rgb_string(rgb: &str) -> String {
     let rgb = rgb.trim().to_lowercase();
 
     // Extract numbers from rgb(r, g, b) or rgba(r, g, b, a)
-    let re = regex::Regex::new(r"rgba?\(\s*(\d+)\s*,\s*(\d+)\s*,\s*(\d+)").unwrap();
-    if let Some(caps) = re.captures(&rgb) {
+    if let Some(caps) = RGB_REGEX.captures(&rgb) {
         let r: u8 = caps.get(1).unwrap().as_str().parse().unwrap_or(0);
         let g: u8 = caps.get(2).unwrap().as_str().parse().unwrap_or(0);
         let b: u8 = caps.get(3).unwrap().as_str().parse().unwrap_or(0);

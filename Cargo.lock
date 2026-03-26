@@ -49,6 +49,7 @@ dependencies = [
  "cssparser 0.29.6",
  "ego-tree",
  "html5ever 0.26.0",
+ "once_cell",
  "phf 0.11.3",
  "pyo3",
  "regex",

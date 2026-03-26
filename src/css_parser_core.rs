@@ -1,11 +1,11 @@
 //! CSS Parser module
 
 use crate::html_parser::HtmlElement;
+use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
-/// Get Chromium's default user-agent stylesheet
-/// Simplified version with only the key properties we care about
-pub fn get_user_agent_stylesheet() -> Vec<CssRule> {
+/// Cached user-agent stylesheet - parsed once and reused
+static UA_STYLESHEET: Lazy<Vec<CssRule>> = Lazy::new(|| {
     let css_text = r#"
 html { display: block; }
 body { display: block; margin: 8px; }
@@ -115,6 +115,11 @@ menu { display: block; list-style-type: disc; }
 main, article, aside, footer, header, nav, section { display: block; }
 "#;
     parse_css_text_with_origin(css_text, CssOrigin::UserAgent)
+});
+
+/// Get Chromium's default user-agent stylesheet (cached)
+pub fn get_user_agent_stylesheet() -> &'static Vec<CssRule> {
+    &UA_STYLESHEET
 }
 
 /// Parse CSS text with a specific origin

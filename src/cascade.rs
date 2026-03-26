@@ -6,6 +6,87 @@ use crate::computed::compute_value;
 use crate::scraper_adapter::{ScrapedElement, ScrapedElements};
 use std::collections::HashMap;
 
+/// Indexed CSS rules for fast matching
+/// Groups rules by selector type to avoid checking all rules for each element
+#[derive(Debug, Clone)]
+struct IndexedCssRules<'a> {
+    /// Rules that match any element (universal selector *)
+    universal: Vec<&'a CssRule>,
+    /// Rules indexed by tag name (lowercase)
+    by_tag: HashMap<String, Vec<&'a CssRule>>,
+    /// Rules indexed by class name
+    by_class: HashMap<String, Vec<&'a CssRule>>,
+    /// Rules indexed by ID
+    by_id: HashMap<String, Vec<&'a CssRule>>,
+    /// Rules with attribute selectors
+    attr: Vec<&'a CssRule>,
+    /// Rules with pseudo selectors
+    pseudo: Vec<&'a CssRule>,
+    /// Rules with complex selectors (descendant, child, etc.) - must check tree structure
+    complex: Vec<&'a CssRule>,
+}
+
+impl<'a> IndexedCssRules<'a> {
+    fn new(rules: &'a [&'a CssRule]) -> Self {
+        let mut indexed = IndexedCssRules {
+            universal: Vec::new(),
+            by_tag: HashMap::new(),
+            by_class: HashMap::new(),
+            by_id: HashMap::new(),
+            attr: Vec::new(),
+            pseudo: Vec::new(),
+            complex: Vec::new(),
+        };
+
+        for rule in rules {
+            let selector = rule.selector.trim();
+            if selector.is_empty() {
+                continue;
+            }
+
+            let first_char = selector.chars().next().unwrap_or(' ');
+
+            // Check for combinators (space, >, +, ~) - these need tree structure
+            if selector.contains(' ') || selector.starts_with('>')
+                || selector.starts_with('+') || selector.starts_with('~') {
+                indexed.complex.push(rule);
+                continue;
+            }
+
+            match first_char {
+                '*' => {
+                    indexed.universal.push(rule);
+                }
+                '#' => {
+                    // ID selector
+                    let id = selector.strip_prefix('#').unwrap_or("").to_lowercase();
+                    indexed.by_id.entry(id).or_default().push(rule);
+                }
+                '.' => {
+                    // Class selector
+                    let class = selector.strip_prefix('.').unwrap_or("").to_lowercase();
+                    indexed.by_class.entry(class).or_default().push(rule);
+                }
+                '[' => {
+                    // Attribute selector
+                    indexed.attr.push(rule);
+                }
+                ':' => {
+                    // Pseudo selector
+                    indexed.pseudo.push(rule);
+                }
+                _ => {
+                    // Tag selector
+                    let tag_lower = selector.to_lowercase();
+                    indexed.by_tag.entry(tag_lower).or_default().push(rule);
+                }
+            }
+        }
+
+        indexed
+    }
+}
+
 /// Compute styles using ScrapedElements (from scraper parser)
 /// filter_properties: if Some, only compute these properties (e.g., ["font-size", "color"])
 pub fn compute_styles_from_scraper(
@@ -13,20 +94,23 @@ pub fn compute_styles_from_scraper(
     css_rules: &[CssRule],
     filter_properties: Option<&[String]>,
 ) -> Result<Vec<crate::ElementStyles>, Box<dyn std::error::Error>> {
-    // Get user-agent rules
+    // Get user-agent rules (cached reference)
     let ua_rules = get_user_agent_stylesheet();
 
     // Combine user-agent rules with author rules (user-agent first, then author overrides)
-    let mut all_rules = Vec::with_capacity(ua_rules.len() + css_rules.len());
-    all_rules.extend(ua_rules);
-    all_rules.extend(css_rules.iter().cloned());
+    let mut all_rules: Vec<&CssRule> = Vec::with_capacity(ua_rules.len() + css_rules.len());
+    all_rules.extend(ua_rules.iter());
+    all_rules.extend(css_rules.iter());
 
     // Filter CSS rules to only those that contain any of the target properties
-    let filtered_rules = if let Some(props) = filter_properties {
+    let filtered_rules: Vec<&CssRule> = if let Some(props) = filter_properties {
         filter_rules_by_properties(&all_rules, props)
     } else {
         all_rules
     };
+
+    // Create indexed rules for fast matching
+    let indexed_rules = IndexedCssRules::new(&filtered_rules);
 
     // Extract CSS variables
     let css_variables = extract_css_variables_from_rules(&filtered_rules);
@@ -34,7 +118,8 @@ pub fn compute_styles_from_scraper(
     // Compute styles in DOM order (elements are already in DOM order)
     // Use a stack-based approach to track parent styles for em -> px conversion
     let mut computed_styles_list: Vec<HashMap<String, String>> = Vec::with_capacity(scraped.elements.len());
-    let mut parent_stack: Vec<HashMap<String, String>> = Vec::new();
+    // Use indices instead of references to avoid clone
+    let mut parent_stack: Vec<usize> = Vec::new();
 
     for (idx, element) in scraped.elements.iter().enumerate() {
         // Pop stack entries that are at or above current depth
@@ -42,32 +127,32 @@ pub fn compute_styles_from_scraper(
             parent_stack.pop();
         }
 
-        // Get parent's computed styles (top of stack after popping, if any)
+        // Get parent's computed styles using index into computed_styles_list
         let parent_computed: Option<&HashMap<String, String>> =
-            if parent_stack.is_empty() { None } else { parent_stack.last() };
+            if parent_stack.is_empty() { None } else { computed_styles_list.get(*parent_stack.last().unwrap()) };
 
         let computed = compute_styles_for_scraper_element(
             element,
-            &filtered_rules,
+            &indexed_rules,
             &css_variables,
             filter_properties,
             parent_computed,
         );
 
-        computed_styles_list.push(computed.clone());
+        computed_styles_list.push(computed);
 
-        // Push current element's computed styles to stack for its children
-        parent_stack.push(computed);
+        // Push current element's index to stack for its children
+        parent_stack.push(idx);
     }
 
-    // Build final result
+    // Build final result - move from computed_styles_list instead of cloning
     let elements = scraped.elements.iter().enumerate().map(|(idx, element)| {
         crate::ElementStyles {
             path: element.tag.clone(),
             tag: element.tag.clone(),
             attributes: element.attributes.clone(),
             matched_rules: Vec::new(),
-            computed_styles: computed_styles_list[idx].clone(),
+            computed_styles: computed_styles_list.swap_remove(idx),
         }
     }).collect();
 
@@ -75,21 +160,21 @@ pub fn compute_styles_from_scraper(
 }
 
 /// Filter CSS rules to only those that contain any of the target properties
-fn filter_rules_by_properties(rules: &[CssRule], target_props: &[String]) -> Vec<CssRule> {
+fn filter_rules_by_properties<'a>(rules: &'a [&'a CssRule], target_props: &[String]) -> Vec<&'a CssRule> {
     rules.iter()
         .filter(|rule| {
             rule.declarations.keys().any(|prop| {
                 target_props.iter().any(|tp| prop == tp)
             })
         })
-        .cloned()
+        .copied()
         .collect()
 }
 
-/// Compute styles for a single ScrapedElement
-fn compute_styles_for_scraper_element(
+/// Compute styles for a single ScrapedElement using indexed rules
+fn compute_styles_for_scraper_element<'a>(
     element: &ScrapedElement,
-    css_rules: &[CssRule],
+    indexed_rules: &IndexedCssRules<'a>,
     css_variables: &HashMap<String, String>,
     filter_properties: Option<&[String]>,
     parent_computed: Option<&HashMap<String, String>>,
@@ -105,8 +190,8 @@ fn compute_styles_for_scraper_element(
         }
     }
 
-    // Find matching rules
-    let matched_rules = find_matching_rules_for_scraper(element, css_rules);
+    // Find matching rules using indexed lookup
+    let matched_rules = find_matching_rules_for_scraper_indexed(element, indexed_rules);
 
     // Cascade
     let mut cascaded: HashMap<String, CascadedValue> = HashMap::new();
@@ -175,13 +260,87 @@ fn compute_styles_for_scraper_element(
     computed
 }
 
+/// Find matching rules using indexed lookup
+fn find_matching_rules_for_scraper_indexed<'a>(
+    element: &ScrapedElement,
+    indexed: &IndexedCssRules<'a>,
+) -> Vec<&'a CssRule> {
+    let mut matched = Vec::new();
+
+    // Check universal rules (*)
+    for rule in &indexed.universal {
+        if scraper_element_matches_selector(element, &rule.selector) {
+            matched.push(*rule);
+        }
+    }
+
+    // Check tag rules
+    let tag_lower = element.tag.to_lowercase();
+    if let Some(tag_rules) = indexed.by_tag.get(&tag_lower) {
+        for rule in tag_rules {
+            if scraper_element_matches_selector(element, &rule.selector) {
+                matched.push(*rule);
+            }
+        }
+    }
+
+    // Check ID rules
+    if let Some(ref id) = element.id {
+        let id_lower = id.to_lowercase();
+        if let Some(id_rules) = indexed.by_id.get(&id_lower) {
+            for rule in id_rules {
+                if scraper_element_matches_selector(element, &rule.selector) {
+                    matched.push(*rule);
+                }
+            }
+        }
+    }
+
+    // Check class rules
+    if let Some(ref class) = element.class {
+        for class_name in class.split_whitespace() {
+            let class_lower = class_name.to_lowercase();
+            if let Some(class_rules) = indexed.by_class.get(&class_lower) {
+                for rule in class_rules {
+                    if scraper_element_matches_selector(element, &rule.selector) {
+                        matched.push(*rule);
+                    }
+                }
+            }
+        }
+    }
+
+    // Check attribute rules
+    for rule in &indexed.attr {
+        if scraper_element_matches_selector(element, &rule.selector) {
+            matched.push(*rule);
+        }
+    }
+
+    // Check pseudo rules
+    for rule in &indexed.pseudo {
+        if scraper_element_matches_selector(element, &rule.selector) {
+            matched.push(*rule);
+        }
+    }
+
+    // Check complex rules (descendant, child, etc.)
+    for rule in &indexed.complex {
+        if scraper_element_matches_selector(element, &rule.selector) {
+            matched.push(*rule);
+        }
+    }
+
+    matched
+}
+
 /// Find matching rules for a ScrapedElement
-fn find_matching_rules_for_scraper<'a>(element: &ScrapedElement, rules: &'a [CssRule]) -> Vec<&'a CssRule> {
+fn find_matching_rules_for_scraper<'a>(element: &ScrapedElement, rules: &'a [&'a CssRule]) -> Vec<&'a CssRule> {
     let mut matched = Vec::new();
 
     for rule in rules {
         if scraper_element_matches_selector(element, &rule.selector) {
-            matched.push(rule);
+            matched.push(*rule);
         }
     }
 
@@ -273,7 +432,7 @@ pub fn compute_element_styles(
 }
 
 /// Extract CSS variables from rules
-fn extract_css_variables_from_rules(css_rules: &[CssRule]) -> HashMap<String, String> {
+fn extract_css_variables_from_rules<'a>(css_rules: &'a [&'a CssRule]) -> HashMap<String, String> {
     let mut vars = HashMap::new();
 
     for rule in css_rules {
