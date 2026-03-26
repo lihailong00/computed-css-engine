@@ -1,0 +1,17 @@
+[build-system]
+requires = ["maturin>=1.0,<2.0"]
+build-backend = "maturin"
+
+[project]
+name = "css-parser"
+version = "0.1.0"
+description = "High-performance CSS parser for Python - parses HTML and computes CSS styles"
+requires-python = ">=3.7"
+dependencies = []
+
+[tool.maturin]
+manifest-path = "Cargo.toml"
+lib-name = "css_parser"
+profile = "release"
+# Manylinux 2014 = glibc 2.17+ (CentOS 7)
+manylinux = "2014"
