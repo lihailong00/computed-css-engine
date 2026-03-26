@@ -90,7 +90,13 @@
       "WebFetch(domain:api.github.com)",
       "WebFetch(domain:github.com)",
       "WebFetch(domain:pip.xn--kg,,-rc5f6dy1ak5cqwbb6hyoilwam91cdja75bd09dxjc48kjmuv4e724alt1cq4fcs4euioln4cw2gqnui39a)",
-      "WebFetch(domain:pip.pypa.io)"
+      "WebFetch(domain:pip.pypa.io)",
+      "Bash(docker:*)",
+      "Bash(cargo install:*)",
+      "Bash(cross build:*)",
+      "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -c \"\nimport css_parser\nimport json\n\nhtml = '<html><body><div id=\\\\\"test\\\\\" style=\\\\\"font-size:20px\\\\\"><p style=\\\\\"font-size:1.5em\\\\\">Hello</p></div></body></html>'\nresult = css_parser.parse_html_and_compute_styles\\(html, False, ['font-size']\\)\nparsed = json.loads\\(result\\)\nprint\\(f'Elements found: {len\\(parsed[\\\\\"elements\\\\\"]\\)}'\\)\nfor e in parsed['elements']:\n    print\\(f'  tag={e[\\\\\"tag\\\\\"]}, id={e.get\\(\\\\\"attributes\\\\\",{}\\).get\\(\\\\\"id\\\\\"\\)}, depth={e.get\\(\\\\\"depth\\\\\"\\)}, font-size={e.get\\(\\\\\"computed_styles\\\\\",{}\\).get\\(\\\\\"font-size\\\\\"\\)}'\\)\n\")",
+      "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -c \"\nimport css_parser\nimport json\n\nhtml = '<html><body><div id=\\\\\"test\\\\\" style=\\\\\"font-size:20px\\\\\"><p style=\\\\\"font-size:1.5em\\\\\">Hello</p></div></body></html>'\nresult = css_parser.parse_html_and_compute_styles\\(html, False, ['font-size']\\)\nprint\\(result\\)\n\")",
+      "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -c \"\nimport css_parser\nimport json\n\nhtml = '<a id=\\\\\"title\\\\\" href=\\\\\"#\\\\\">Test Link</a>'\nresult = css_parser.parse_html_and_compute_styles\\(html, False, ['color']\\)\nparsed = json.loads\\(result\\)\nprint\\('Elements with color:'\\)\nfor e in parsed['elements']:\n    if e.get\\('computed_styles', {}\\).get\\('color'\\):\n        print\\(f'  {e[\\\\\"tag\\\\\"]}#{e.get\\(\\\\\"attributes\\\\\",{}\\).get\\(\\\\\"id\\\\\"\\)}: color = {e[\\\\\"computed_styles\\\\\"][\\\\\"color\\\\\"]}'\\)\n\")"
     ]
   }
 }

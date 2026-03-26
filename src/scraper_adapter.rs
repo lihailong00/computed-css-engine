@@ -18,7 +18,7 @@ pub struct ScrapedElement {
     pub class: Option<String>,
     pub attributes: HashMap<String, String>,
     pub inline_style: Option<String>,
-    /// Depth in DOM tree (0 for root) - approximate
+    /// Depth in DOM tree (0 for root)
     pub depth: usize,
     /// Index of parent element in the elements vector, None for root
     pub parent_index: Option<usize>,
@@ -37,65 +37,88 @@ pub fn parse_html_with_scraper(html: &str) -> Result<ScrapedElements, String> {
         css_rules.extend(parsed);
     }
 
-    // Use select to get all elements - returns them in DOM order
-    // Elements come from document order (pre-order traversal)
-    let all_selector = Selector::parse("*").unwrap();
+    // Use scraper's tree to properly traverse DOM with parent tracking
+    // The tree field gives us access to the underlying ego_tree
+    let tree = document.tree.clone();
 
-    // Track elements and estimate depth based on common tag nesting patterns
-    let mut elements_with_info: Vec<(String, Option<String>, Option<String>, HashMap<String, String>, Option<String>)> = Vec::new();
-
-    for elem in document.select(&all_selector) {
-        let tag = elem.value().name().to_string();
-
-        // Skip non-renderable elements
-        if tag == "script" || tag == "style" || tag == "link" || tag == "meta"
-            || tag == "title" || tag == "head" {
-            continue;
-        }
-
-        elements_with_info.push((
-            tag,
-            elem.value().attr("id").map(|s| s.to_string()),
-            elem.value().attr("class").map(|s| s.to_string()),
-            elem.value().attrs().map(|(k, v)| (k.to_string(), v.to_string())).collect(),
-            elem.value().attr("style").map(|s| s.to_string()),
-        ));
-    }
-
-    // Estimate depth based on tag hierarchy (simplified approach)
-    // This is an approximation since we don't have full tree structure
+    // Collect elements using proper tree traversal
     let mut elements: Vec<ScrapedElement> = Vec::new();
+    let mut parent_stack: Vec<usize> = Vec::new(); // Stack of element indices
 
-    for (i, (tag, id, class, attrs, inline_style)) in elements_with_info.into_iter().enumerate() {
-        // Estimate depth based on tag type and position
-        // Root elements have depth 0, children have depth 1, etc.
-        // This is a simplified heuristic
-        let depth = estimate_element_depth(&tag, &elements, i);
-
-        elements.push(ScrapedElement {
-            tag,
-            id,
-            class,
-            attributes: attrs,
-            inline_style,
-            depth,
-            parent_index: None, // Not easily available without full tree traversal
-        });
-    }
+    traverse_tree(&tree.root(), &mut elements, &mut parent_stack);
 
     Ok(ScrapedElements { elements, css_rules })
 }
 
-/// Estimate element depth based on tag and previous elements (simplified)
-fn estimate_element_depth(tag: &str, _elements: &[ScrapedElement], _index: usize) -> usize {
-    // Common root elements
-    match tag {
-        "html" | "body" => 0,
-        "div" | "p" | "span" | "ul" | "ol" | "li" | "table" | "tr" | "td" | "th"
-        | "form" | "input" | "button" | "a" | "h1" | "h2" | "h3" | "h4" | "h5" | "h6"
-        | "header" | "footer" | "nav" | "section" | "article" | "aside" | "main"
-        | "figure" | "figcaption" | "details" | "summary" => 1,
-        _ => 1,
+/// Recursively traverse the DOM tree and collect elements with parent info
+fn traverse_tree(
+    node: &ego_tree::NodeRef<scraper::Node>,
+    elements: &mut Vec<ScrapedElement>,
+    parent_stack: &mut Vec<usize>,
+) {
+    // Check if this node is an element
+    if let Some(elem_data) = node.value().as_element() {
+        let tag = elem_data.name();
+
+        // Skip non-renderable elements
+        if tag != "script" && tag != "style" && tag != "link" && tag != "meta"
+            && tag != "title" && tag != "head" {
+
+            // Extract attributes
+            let mut attributes: HashMap<String, String> = HashMap::new();
+            let mut id: Option<String> = None;
+            let mut class: Option<String> = None;
+            let mut inline_style: Option<String> = None;
+
+            for (attr_name, attr_value) in elem_data.attrs() {
+                let attr_name = attr_name.to_string();
+                let attr_value = attr_value.to_string();
+                if attr_name == "id" {
+                    id = Some(attr_value.clone());
+                } else if attr_name == "class" {
+                    class = Some(attr_value.clone());
+                } else if attr_name == "style" {
+                    inline_style = Some(attr_value.clone());
+                }
+                attributes.insert(attr_name, attr_value);
+            }
+
+            // Get parent index from stack
+            let depth = parent_stack.len();
+            let parent_index = if parent_stack.is_empty() {
+                None
+            } else {
+                Some(*parent_stack.last().unwrap())
+            };
+
+            let elem_index = elements.len();
+            elements.push(ScrapedElement {
+                tag: tag.to_string(),
+                id,
+                class,
+                attributes,
+                inline_style,
+                depth,
+                parent_index,
+            });
+
+            // Push current element to stack (it will be parent for children)
+            parent_stack.push(elem_index);
+        }
+    }
+
+    // Recursively traverse children
+    for child in node.children() {
+        traverse_tree(&child, elements, parent_stack);
+    }
+
+    // Pop from stack when exiting this element (if it was an element we tracked)
+    if node.value().as_element().map_or(false, |e| {
+        let tag = e.name();
+        tag != "script" && tag != "style" && tag != "link" && tag != "meta"
+            && tag != "title" && tag != "head"
+    }) {
+        parent_stack.pop();
     }
 }
 
@@ -243,5 +266,23 @@ mod tests {
         assert!(is_valid_selector("div"));
         assert!(is_valid_selector("#id"));
         assert!(is_valid_selector(".class"));
+    }
+
+    #[test]
+    fn test_parent_tracking() {
+        let html = r#"<html><body><div id="parent"><p id="child">Hello</p></div></body></html>"#;
+        let result = parse_html_with_scraper(html).unwrap();
+
+        // Find the p element
+        let p_elem = result.elements.iter().find(|e| e.id.as_deref() == Some("child")).unwrap();
+        let parent_elem = result.elements.iter().find(|e| e.id.as_deref() == Some("parent")).unwrap();
+
+        // P should have parent_index pointing to div
+        assert!(p_elem.parent_index.is_some());
+        let parent_idx = p_elem.parent_index.unwrap();
+        assert_eq!(result.elements[parent_idx].tag, "div");
+
+        // Depth should be: html=0, body=1, div=2, p=3
+        assert_eq!(p_elem.depth, 3);
     }
 }
