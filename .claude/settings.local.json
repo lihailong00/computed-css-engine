@@ -80,7 +80,17 @@
       "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -m pip install /home/longcoding/dev/project/css_parser/target/wheels/css_parser-0.1.0-cp312-cp312-manylinux_2_34_x86_64.whl --force-reinstall 2>&1)",
       "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -c \"\nimport css_parser\nimport json\n\nhtml = '<div style=\\\\\"font-size: 1.5em; color: red;\\\\\"><p style=\\\\\"font-size: 2em;\\\\\">Hello</p></div>'\nresult = css_parser.parse_html_and_compute_styles\\(html, False, ['font-size', 'color']\\)\nprint\\(json.loads\\(result\\)\\)\n\")",
       "Bash(git remote:*)",
-      "Bash(git add:*)"
+      "Bash(git add:*)",
+      "Bash(git commit:*)",
+      "Bash(git config:*)",
+      "Bash(git push:*)",
+      "Bash(git tag:*)",
+      "Bash(gh run:*)",
+      "Bash(curl -s \"https://api.github.com/repos/lihailong00/css_parser/actions/runs\")",
+      "WebFetch(domain:api.github.com)",
+      "WebFetch(domain:github.com)",
+      "WebFetch(domain:pip.xn--kg,,-rc5f6dy1ak5cqwbb6hyoilwam91cdja75bd09dxjc48kjmuv4e724alt1cq4fcs4euioln4cw2gqnui39a)",
+      "WebFetch(domain:pip.pypa.io)"
     ]
   }
 }
