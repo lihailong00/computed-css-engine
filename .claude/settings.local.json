@@ -129,7 +129,8 @@
       "Bash(curl -s \"https://api.github.com/repos/lihailong00/computed-css-engine/actions/runs?per_page=5\")",
       "Bash(curl -s \"https://api.github.com/repos/lihailong00/computed-css-engine/tags\")",
       "Bash(curl:*)",
-      "Bash(git checkout:*)"
+      "Bash(git checkout:*)",
+      "Bash(pip index:*)"
     ]
   }
 }
