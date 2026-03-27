@@ -34,23 +34,25 @@ jobs:
     runs-on: windows-latest
     strategy:
       matrix:
-        target:
-          - x64
         python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
       - uses: actions/checkout@v5
 
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: ${{ matrix.python-version }}
+
       - name: Build wheels
         uses: PyO3/maturin-action@v1
         with:
-          target: ${{ matrix.target }}
+          target: x64
           args: --release --out dist
-          python-version: ${{ matrix.python-version }}
 
       - name: Upload wheels
         uses: actions/upload-artifact@v7
         with:
-          name: computed-css-engine-${{ matrix.target }}-${{ matrix.python-version }}
+          name: computed-css-engine-windows-${{ matrix.python-version }}
           path: dist/*.whl
 
   release:
