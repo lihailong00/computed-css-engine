@@ -25,7 +25,7 @@ jobs:
           args: --release --out dist -i python${{ matrix.python-version }}
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: computed-css-engine-${{ matrix.target }}-${{ matrix.python-version }}
           path: dist/*.whl
@@ -48,7 +48,7 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v5
+        uses: actions/upload-artifact@v7
         with:
           name: computed-css-engine-${{ matrix.target }}-${{ matrix.python-version }}
           path: dist/*.whl
@@ -62,7 +62,7 @@ jobs:
       contents: write
     steps:
       - name: Download all wheels
-        uses: actions/download-artifact@v5
+        uses: actions/download-artifact@v4
         with:
           path: dist
           merge-multiple: true
