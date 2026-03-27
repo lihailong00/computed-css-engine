@@ -146,13 +146,13 @@ pub fn compute_styles_from_scraper(
     }
 
     // Build final result - move from computed_styles_list instead of cloning
-    let elements = scraped.elements.iter().enumerate().map(|(idx, element)| {
+    let elements = scraped.elements.iter().zip(computed_styles_list.into_iter()).map(|(element, computed_styles)| {
         crate::ElementStyles {
             path: element.tag.clone(),
             tag: element.tag.clone(),
             attributes: element.attributes.clone(),
             matched_rules: Vec::new(),
-            computed_styles: computed_styles_list.swap_remove(idx),
+            computed_styles,
         }
     }).collect();
 
@@ -267,64 +267,52 @@ fn find_matching_rules_for_scraper_indexed<'a>(
 ) -> Vec<&'a CssRule> {
     let mut matched = Vec::new();
 
-    // Check universal rules (*)
+    // Check universal rules (*) - these need full matching for pseudo-classes
     for rule in &indexed.universal {
         if scraper_element_matches_selector(element, &rule.selector) {
             matched.push(*rule);
         }
     }
 
-    // Check tag rules
+    // Check tag rules - direct match since we indexed by exact tag name
     let tag_lower = element.tag.to_lowercase();
     if let Some(tag_rules) = indexed.by_tag.get(&tag_lower) {
-        for rule in tag_rules {
-            if scraper_element_matches_selector(element, &rule.selector) {
-                matched.push(*rule);
-            }
-        }
+        matched.extend(tag_rules.iter().copied());
     }
 
-    // Check ID rules
+    // Check ID rules - direct match since we indexed by exact ID
     if let Some(ref id) = element.id {
         let id_lower = id.to_lowercase();
         if let Some(id_rules) = indexed.by_id.get(&id_lower) {
-            for rule in id_rules {
-                if scraper_element_matches_selector(element, &rule.selector) {
-                    matched.push(*rule);
-                }
-            }
+            matched.extend(id_rules.iter().copied());
         }
     }
 
-    // Check class rules
+    // Check class rules - direct match since we indexed by exact class name
     if let Some(ref class) = element.class {
         for class_name in class.split_whitespace() {
             let class_lower = class_name.to_lowercase();
             if let Some(class_rules) = indexed.by_class.get(&class_lower) {
-                for rule in class_rules {
-                    if scraper_element_matches_selector(element, &rule.selector) {
-                        matched.push(*rule);
-                    }
-                }
+                matched.extend(class_rules.iter().copied());
             }
         }
     }
 
-    // Check attribute rules
+    // Check attribute rules - need full matching
     for rule in &indexed.attr {
         if scraper_element_matches_selector(element, &rule.selector) {
             matched.push(*rule);
         }
     }
 
-    // Check pseudo rules
+    // Check pseudo rules - need full matching
     for rule in &indexed.pseudo {
         if scraper_element_matches_selector(element, &rule.selector) {
             matched.push(*rule);
         }
     }
 
-    // Check complex rules (descendant, child, etc.)
+    // Check complex rules (descendant, child, etc.) - need full matching
     for rule in &indexed.complex {
         if scraper_element_matches_selector(element, &rule.selector) {
             matched.push(*rule);

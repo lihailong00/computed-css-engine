@@ -225,7 +225,7 @@ fn compute_styles(
 
 /// Python module definition
 #[pyo3::pymodule]
-pub fn css_parser(m: &Bound<'_, PyModule>) -> PyResult<()> {
+pub fn computed_css_engine(m: &Bound<'_, PyModule>) -> PyResult<()> {
     m.add_function(wrap_pyfunction!(parse_html_and_compute_styles, m)?)?;
     m.add_function(wrap_pyfunction!(parse_html_and_write_styles, m)?)?;
     Ok(())

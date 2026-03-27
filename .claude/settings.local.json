@@ -100,7 +100,27 @@
       "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -c \"\nimport time\nimport json\nimport css_parser\n\ntest_pages_dir = '/home/longcoding/dev/project/css_parser/test_pages'\nhtml_files = [\n    'pytorch.html',\n    'simple_page.html',\n    'bootstrap_example.html',\n    'html5_test.html',\n    'inline_style_test.html',\n    'w3c_wcag.html'\n]\n\nall_props = None\nfilter_props = ['color', 'font-size', 'font-weight', 'background-color', 'height', 'width']\n\nprint\\('=' * 70\\)\nprint\\('性能测试 - 优化1: UA Stylesheet 缓存'\\)\nprint\\('=' * 70\\)\n\nfor html_file in html_files:\n    path = f'{test_pages_dir}/{html_file}'\n    with open\\(path, 'r', encoding='utf-8'\\) as f:\n        html = f.read\\(\\)\n    \n    start = time.time\\(\\)\n    for _ in range\\(10\\):\n        result = css_parser.parse_html_and_compute_styles\\(html, False, all_props\\)\n    full_time = \\(time.time\\(\\) - start\\) / 10 * 1000\n    \n    start = time.time\\(\\)\n    for _ in range\\(10\\):\n        result = css_parser.parse_html_and_compute_styles\\(html, False, filter_props\\)\n    filter_time = \\(time.time\\(\\) - start\\) / 10 * 1000\n    \n    speedup = full_time / filter_time if filter_time > 0 else 0\n    \n    print\\(f'{html_file:<35}'\\)\n    print\\(f'  全量属性: {full_time:>8.2f} ms'\\)\n    print\\(f'  筛选属性: {filter_time:>8.2f} ms'\\)\n    print\\(f'  加速比:   {speedup:>8.2f}x'\\)\n    print\\(\\)\n\nprint\\('=' * 70\\)\n\")",
       "Bash(.venv/bin/python -m pytest tests/test_accuracy.py -v)",
       "Bash(python:*)",
-      "Bash(git init:*)"
+      "Bash(git init:*)",
+      "Bash(cargo search:*)",
+      "Bash(cargo info:*)",
+      "Bash(grep -r \"Selector\" src/*.rs)",
+      "Bash(cargo add:*)",
+      "Bash(dpkg -l)",
+      "Bash(aarch64-linux-gnu-gcc:*)",
+      "Bash(echo $HTTP_PROXY)",
+      "Bash(echo $HTTPS_PROXY)",
+      "Bash(netstat -tlnp)",
+      "Bash(__NEW_LINE_9b1c326079b2d255__ docker:*)",
+      "Bash(__NEW_LINE_9c79f9d21c44c815__ docker:*)",
+      "Bash(git fetch:*)",
+      "Bash(git branch:*)",
+      "Bash(curl -s \"https://api.github.com/repos/actions/upload-artifact/releases/latest\")",
+      "Bash(curl -s \"https://api.github.com/repos/actions/upload-artifact/releases?per_page=3\")",
+      "Bash(curl -s \"https://api.github.com/repos/actions/download-artifact/releases?per_page=5\")",
+      "WebFetch(domain:pypi.org)",
+      "Bash(curl -s \"https://api.github.com/repos/actions/setup-python/releases?per_page=3\")",
+      "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -m pip install maturin)",
+      "Bash(source .venv/bin/activate)"
     ]
   }
 }
