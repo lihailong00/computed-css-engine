@@ -6,10 +6,10 @@ import json
 import re
 from collections import defaultdict
 from playwright.async_api import async_playwright
-import css_parser
+import computed_css_engine
 
 def rust_parse(html, filter_properties):
-    result = css_parser.parse_html_and_compute_styles(html, False, filter_properties)
+    result = computed_css_engine.parse_html_and_compute_styles(html, False, filter_properties)
     return json.loads(result)
 
 def normalize_css_value(prop, value):

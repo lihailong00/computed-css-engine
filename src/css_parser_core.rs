@@ -5,48 +5,54 @@ use once_cell::sync::Lazy;
 use std::collections::HashMap;
 
 /// Cached user-agent stylesheet - parsed once and reused
+/// Based on Chromium Blink UA stylesheet (LGPL licensed)
 static UA_STYLESHEET: Lazy<Vec<CssRule>> = Lazy::new(|| {
     let css_text = r#"
 html { display: block; }
-body { display: block; margin: 8px; }
+body { display: block; margin: 8px; font-size: 16px; line-height: normal; }
 div { display: block; }
 p { display: block; margin: 1em 0; }
-h1 { display: block; font-size: 2em; font-weight: bold; margin: 0.67em 0; }
-h2 { display: block; font-size: 1.5em; font-weight: bold; margin: 0.83em 0; }
-h3 { display: block; font-size: 1.17em; font-weight: bold; margin: 1em 0; }
-h4 { display: block; font-weight: bold; margin: 1.33em 0; }
-h5 { display: block; font-size: 0.83em; font-weight: bold; margin: 1.67em 0; }
-h6 { display: block; font-size: 0.67em; font-weight: bold; margin: 2.33em 0; }
+h1 { display: block; font-size: 2em; font-weight: 700; margin: 0.67em 0; }
+h2 { display: block; font-size: 1.5em; font-weight: 700; margin: 0.83em 0; }
+h3 { display: block; font-size: 1.17em; font-weight: 700; margin: 1em 0; }
+h4 { display: block; font-size: 1em; font-weight: 700; margin: 1.33em 0; }
+h5 { display: block; font-size: 0.83em; font-weight: 700; margin: 1.67em 0; }
+h6 { display: block; font-size: 0.67em; font-weight: 700; margin: 2.33em 0; }
 article, aside, footer, header, hgroup, main, nav, section { display: block; }
 blockquote { display: block; margin: 1em 40px; }
-address { display: block; }
+q { display: inline; }
+q:before { content: open-quote; }
+q:after { content: close-quote; }
+center { display: block; text-align: center; }
+address { display: block; font-style: italic; }
 figure { display: block; margin: 1em 40px; }
 figcaption { display: block; }
-hr { display: block; overflow: hidden; margin: 0.5em auto; border: 1px solid gray; }
+hr { display: block; margin: 0.5em auto; border: 1px inset gray; color: gray; }
 ul, menu, dir { display: block; list-style-type: disc; margin: 1em 0; padding-left: 40px; }
 ol { display: block; list-style-type: decimal; margin: 1em 0; padding-left: 40px; }
 li { display: list-item; }
 dl { display: block; margin: 1em 0; }
 dt { display: block; }
 dd { display: block; margin-left: 40px; }
-table { display: table; border-collapse: separate; border-spacing: 2px; }
+table { display: table; border-collapse: separate; border-spacing: 2px; box-sizing: border-box; }
 thead { display: table-header-group; vertical-align: middle; }
 tbody { display: table-row-group; vertical-align: middle; }
 tfoot { display: table-footer-group; vertical-align: middle; }
-tr { display: table-row; }
-td, th { display: table-cell; vertical-align: inherit; }
+tr { display: table-row; vertical-align: inherit; }
+td, th { display: table-cell; vertical-align: inherit; padding: 1px; }
 th { font-weight: bold; text-align: center; }
 caption { display: table-caption; text-align: center; }
 col { display: table-column; }
 colgroup { display: table-column-group; }
 form { display: block; margin-top: 0; }
-fieldset { display: block; margin: 2px; border: 2px groove ThreeDFace; padding: 0.35em 0.625em 0.75em; }
+fieldset { display: block; margin: 2px; border: 2px groove ButtonFace; padding: 0.35em 0.625em 0.75em; }
 legend { display: block; padding: 2px; }
-button { display: inline-block; font: -webkit-small-control; color: buttontext; background: buttonface; border: 2px outset ButtonBorder; padding: 1px 6px; }
-input { display: inline-block; font: -webkit-small-control; color: buttontext; appearance: auto; }
-select { display: inline-block; font: -webkit-small-control; color: buttontext; appearance: auto; }
-textarea { display: inline-block; font: -webkit-small-control; color: buttontext; appearance: auto; white-space: pre-wrap; font-family: monospace; }
+button { display: inline-block; font: -webkit-small-control; color: #000000; background: #ffffff; border: 2px outset ButtonFace; padding: 1px 6px; }
+input { display: inline-block; font: -webkit-small-control; color: #000000; background: #ffffff; appearance: auto; }
+select { display: inline-block; font: -webkit-small-control; color: #000000; background: #ffffff; appearance: auto; }
+textarea { display: inline-block; font: -webkit-small-control; color: #000000; background: #ffffff; appearance: auto; white-space: pre-wrap; font-family: monospace; }
 a { color: #0000ee; text-decoration: underline; cursor: pointer; }
+a:active { color: #ee0000; }
 strong, b { font-weight: bold; }
 i, cite, em, var, address, dfn { font-style: italic; }
 tt, code, kbd, samp { font-family: monospace; }
@@ -76,22 +82,25 @@ meta { display: none; }
 title { display: none; }
 noscript { display: block; }
 canvas { display: inline; }
-img, embed, object, video { display: inline; }
+img, embed, object { display: inline; }
+video { display: inline-block; object-fit: contain; }
+audio { display: inline-block; }
 area { display: inline; }
 map { display: inline; }
 svg { display: inline; }
 frame { display: block; }
-frameset { display: block; border: 2px groove ThreeDFace; }
-iframe { display: inline; border: 2px inset; }
-fencedframe { display: inline; border: 2px inset; }
+frameset { display: block; border: 2px groove ButtonFace; }
+iframe { display: inline; border: 2px inset ButtonFace; }
+fencedframe { display: inline; border: 2px inset ButtonFace; }
 param { display: none; }
 source { display: none; }
 track { display: none; }
 wbr { display: inline; }
 keygen { display: inline-block; }
-progress { display: inline-block; }
-meter { display: inline-block; }
+progress { display: inline-block; vertical-align: -0.2em; }
+meter { display: inline-block; vertical-align: -0.2em; }
 option { display: block; }
+optgroup { font-weight: bold; display: block; }
 span { display: inline; }
 i, em, cite, dfn, var, address { font-style: italic; }
 b, strong { font-weight: bold; }
@@ -104,7 +113,7 @@ sub { vertical-align: sub; }
 sup { vertical-align: super; }
 br { display: inline; }
 label { display: inline; cursor: default; }
-abbr { border-bottom: 1px dotted; }
+abbr { display: inline; }
 ruby { display: ruby; }
 rt { display: ruby-text; font-size: 50%; }
 mark { background: yellow; color: black; }
@@ -113,6 +122,23 @@ data { display: inline; }
 details, summary { display: block; }
 menu { display: block; list-style-type: disc; }
 main, article, aside, footer, header, nav, section { display: block; }
+/* SVG specific */
+svg:not(:root) { display: inline; overflow: hidden; }
+/* Hidden elements */
+area, base, basefont, datalist, head, link, menu, meta, noembed, noframes, noscript, object, param, rp, script, source, style, template, title { display: none; }
+/* Text elements */
+bdi { display: inline; }
+bdo { display: inline; }
+rp { display: none; }
+rtc { display: inline; }
+/* MathML */
+math { display: inline; }
+mi { display: inline; }
+mn { display: inline; }
+mo { display: inline; }
+ms { display: inline; }
+mtext { display: inline; }
+annotation-xml { display: inline; }
 "#;
     parse_css_text_with_origin(css_text, CssOrigin::UserAgent)
 });
