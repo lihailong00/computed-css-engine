@@ -120,7 +120,16 @@
       "WebFetch(domain:pypi.org)",
       "Bash(curl -s \"https://api.github.com/repos/actions/setup-python/releases?per_page=3\")",
       "Bash(/home/longcoding/dev/project/css_parser/.venv/bin/python -m pip install maturin)",
-      "Bash(source .venv/bin/activate)"
+      "Bash(source .venv/bin/activate)",
+      "WebFetch(domain:source.chromium.org)",
+      "WebFetch(domain:raw.githubusercontent.com)",
+      "WebFetch(domain:searchfox.org)",
+      "WebFetch(domain:null.house.archive)",
+      "Bash(curl -s \"https://api.github.com/repos/lihailong00/computed-css-engine/actions/runs\")",
+      "Bash(curl -s \"https://api.github.com/repos/lihailong00/computed-css-engine/actions/runs?per_page=5\")",
+      "Bash(curl -s \"https://api.github.com/repos/lihailong00/computed-css-engine/tags\")",
+      "Bash(curl:*)",
+      "Bash(git checkout:*)"
     ]
   }
 }
