@@ -3,15 +3,17 @@ requires = ["maturin>=1.0,<2.0"]
 build-backend = "maturin"
 
 [project]
-name = "css-parser"
+name = "computed-css-engine"
 version = "0.1.0"
-description = "High-performance CSS parser for Python - parses HTML and computes CSS styles"
+description = "High-performance CSS style computation engine - parses HTML and computes CSS styles for each element"
 requires-python = ">=3.7"
 dependencies = []
 
 [tool.maturin]
 manifest-path = "Cargo.toml"
-lib-name = "css_parser"
+lib-name = "computed_css_engine"
 profile = "release"
 # Manylinux 2014 = glibc 2.17+ (CentOS 7)
 manylinux = "2014"
+# 支持 Python 3.7+
+pythonVersions = ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]

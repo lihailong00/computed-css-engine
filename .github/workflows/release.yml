@@ -13,9 +13,9 @@ jobs:
         target:
           - x86_64-unknown-linux-gnu
           - aarch64-unknown-linux-gnu
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -25,9 +25,9 @@ jobs:
           args: --release --out dist -i python${{ matrix.python-version }}
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: wheels-${{ matrix.target }}-${{ matrix.python-version }}
+          name: computed-css-engine-${{ matrix.target }}-${{ matrix.python-version }}
           path: dist/*.whl
 
   build_windows:
@@ -36,9 +36,9 @@ jobs:
       matrix:
         target:
           - x64
-        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12"]
+        python-version: ["3.7", "3.8", "3.9", "3.10", "3.11", "3.12", "3.13", "3.14"]
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Build wheels
         uses: PyO3/maturin-action@v1
@@ -48,9 +48,9 @@ jobs:
           python-version: ${{ matrix.python-version }}
 
       - name: Upload wheels
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v5
         with:
-          name: wheels-${{ matrix.target }}-${{ matrix.python-version }}
+          name: computed-css-engine-${{ matrix.target }}-${{ matrix.python-version }}
           path: dist/*.whl
 
   release:
@@ -62,7 +62,7 @@ jobs:
       contents: write
     steps:
       - name: Download all wheels
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v5
         with:
           path: dist
           merge-multiple: true
