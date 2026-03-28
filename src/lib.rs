@@ -74,111 +74,174 @@ pub fn parse_html_and_write_styles(
 }
 
 /// Write computed styles to HTML elements' calc-attr attribute
+/// Optimized: single-pass serialization without string replacement
 fn write_styles_to_html_attr(
     html: &str,
     elements: &[ElementStyles],
     filter_properties: Option<&[String]>,
 ) -> String {
-    use scraper::{Html, Selector};
+    use scraper::Html;
 
+    // Parse HTML once
     let document = Html::parse_document(html);
+    let tree = document.tree.clone();
 
-    // Build a map from element index to its computed styles
-    // We need to match elements by their position in the DOM
-    let target_props: Vec<String> = if let Some(props) = filter_properties {
+    // Target properties
+    let target_props: Vec<String> = filter_properties.map(|props| {
         props.iter().map(|s| s.to_string()).collect()
-    } else {
+    }).unwrap_or_else(|| {
         vec!["font-size".to_string(), "font-weight".to_string(), "color".to_string(), "display".to_string()]
-    };
+    });
 
-    // For each element with styles, find it in the DOM and add calc-attr
-    let mut result = html.to_string();
-
+    // Build a map from element key to calc-attr string
+    let mut calc_attr_map: HashMap<String, String> = HashMap::new();
     for elem in elements {
         if elem.computed_styles.is_empty() {
             continue;
         }
 
-        // Build calc-attr value
         let mut attrs: Vec<String> = Vec::new();
         for prop in &target_props {
             if let Some(value) = elem.computed_styles.get(prop) {
-                if !value.is_empty() {
+                if !value.is_empty() && !value.contains("display: none") {
                     attrs.push(format!("{}: {}", prop, value));
                 }
             }
         }
 
-        if attrs.is_empty() {
-            continue;
+        if !attrs.is_empty() {
+            let calc_attr = format!("calc-attr=\"{}\"", attrs.join("; "));
+            let key = element_key(&elem.tag, &elem.attributes);
+            calc_attr_map.insert(key, calc_attr);
         }
+    }
 
-        // Filter out display: none as it's obvious
-        attrs.retain(|attr| !attr.contains("display: none"));
+    // Serialize tree with calc-attr inserted in single pass
+    serialize_with_attrs(tree.root(), &calc_attr_map)
+}
 
-        let calc_attr = format!("calc-attr=\"{}\"", attrs.join("; "));
+/// Create a unique key for an element based on tag and important attributes
+/// Key format: "tag#id.class" or "tag.class" or "tag" for simple matching
+fn element_key(tag: &str, attrs: &HashMap<String, String>) -> String {
+    let mut key = tag.to_string();
+    if let Some(id) = attrs.get("id") {
+        key.push('#');
+        key.push_str(id);
+    }
+    if let Some(class) = attrs.get("class") {
+        // Use only first class (same as original build_selector_for_element)
+        let first_class = class.split_whitespace().next().unwrap_or("");
+        if !first_class.is_empty() {
+            key.push('.');
+            key.push_str(first_class);
+        }
+    }
+    key
+}
 
-        // Find the element in the DOM and insert the attribute
-        // We use the tag and attributes to identify the element
-        let tag = &elem.tag;
-        let selector_str = build_selector_for_element(tag, &elem.attributes);
+/// Serialize tree to HTML string, inserting calc-attr for matching elements
+fn serialize_with_attrs(
+    node: ego_tree::NodeRef<scraper::Node>,
+    calc_attr_map: &HashMap<String, String>,
+) -> String {
+    let mut output = String::new();
+    serialize_node(node, calc_attr_map, &mut output);
+    output
+}
 
-        let selector = match Selector::parse(&selector_str) {
-            Ok(s) => s,
-            Err(_) => continue,
-        };
+fn serialize_node(
+    node: ego_tree::NodeRef<scraper::Node>,
+    calc_attr_map: &HashMap<String, String>,
+    output: &mut String,
+) {
+    match node.value() {
+        scraper::Node::Element(elem) => {
+            let tag = elem.name();
 
-        for elem_in_dom in document.select(&selector) {
-            // Get the element's outer HTML and modify it
-            let outer_html = elem_in_dom.html();
-            if let Some(modified) = insert_attribute(&outer_html, &calc_attr) {
-                result = result.replace(&outer_html, &modified);
-                break;
+            // Skip non-renderable elements for style calculation
+            let is_renderable = !matches!(
+                tag,
+                "script" | "style" | "link" | "meta" | "title" | "head"
+            );
+
+            output.push('<');
+            output.push_str(tag);
+
+            // Collect attributes and build key
+            let mut key = tag.to_string();
+
+            for (name, value) in elem.attrs() {
+                let name = name.to_string();
+                let value = value.to_string();
+
+                // Track id and class for key (only first class)
+                if name == "id" {
+                    key.push('#');
+                    key.push_str(&value);
+                } else if name == "class" {
+                    let first_class = value.split_whitespace().next().unwrap_or("");
+                    if !first_class.is_empty() {
+                        key.push('.');
+                        key.push_str(first_class);
+                    }
+                }
+
+                // Output attribute (skip style attribute - we'll write calc-attr instead)
+                if name != "style" {
+                    output.push(' ');
+                    output.push_str(&name);
+                    output.push_str("=\"");
+                    output.push_str(&value.replace('"', "&quot;"));
+                    output.push('"');
+                }
+            }
+
+            // Check if this element has calc-attr
+            if let Some(calc_attr) = calc_attr_map.get(&key) {
+                output.push(' ');
+                output.push_str(calc_attr);
+            }
+
+            output.push('>');
+
+            // Recurse into children
+            for child in node.children() {
+                serialize_node(child, calc_attr_map, output);
+            }
+
+            // Close tag
+            if !is_self_closing(tag) {
+                output.push_str("</");
+                output.push_str(tag);
+                output.push('>');
+            }
+        }
+        scraper::Node::Text(text) => {
+            output.push_str(text);
+        }
+        scraper::Node::Comment(comment) => {
+            output.push_str("<!--");
+            output.push_str(comment);
+            output.push_str("-->");
+        }
+        scraper::Node::Doctype(_) => {
+            output.push_str("<!DOCTYPE html>");
+        }
+        _ => {
+            // Recurse into children for other node types
+            for child in node.children() {
+                serialize_node(child, calc_attr_map, output);
             }
         }
     }
-
-    result
 }
 
-/// Build a CSS selector from tag and attributes
-fn build_selector_for_element(tag: &str, attrs: &HashMap<String, String>) -> String {
-    let mut selector = tag.to_string();
-
-    if let Some(id) = attrs.get("id") {
-        selector = format!("{}#{}", selector, id);
-    } else if let Some(class) = attrs.get("class") {
-        // Use first class only
-        let first_class = class.split_whitespace().next().unwrap_or("");
-        if !first_class.is_empty() {
-            selector = format!("{}.{}", selector, first_class);
-        }
-    }
-
-    selector
-}
-
-/// Insert an attribute into an element's opening tag
-fn insert_attribute(element_html: &str, new_attr: &str) -> Option<String> {
-    // Find the closing > of the opening tag
-    if let Some(pos) = element_html.find('>') {
-        let mut opening_tag = element_html[..pos + 1].to_string();
-        let rest = &element_html[pos + 1..];
-
-        // Check if calc-attr already exists
-        if opening_tag.contains("calc-attr=") {
-            // Replace existing calc-attr
-            let re = regex::Regex::new(r#"calc-attr="[^"]*""#).unwrap();
-            opening_tag = re.replace(&opening_tag, new_attr.trim_start_matches("calc-attr=")).to_string();
-        } else {
-            // Insert before the closing >
-            opening_tag = opening_tag.replace(">", &format!(" {}", new_attr));
-            opening_tag.push('>');
-        }
-
-        return Some(format!("{}{}", opening_tag, rest));
-    }
-    None
+fn is_self_closing(tag: &str) -> bool {
+    matches!(
+        tag,
+        "area" | "base" | "br" | "col" | "embed" | "hr" | "img" | "input"
+            | "link" | "meta" | "param" | "source" | "track" | "wbr"
+    )
 }
 
 /// Parse HTML and compute CSS styles for all elements.

@@ -9,7 +9,7 @@ use std::collections::HashMap;
 /// Indexed CSS rules for fast matching
 /// Groups rules by selector type to avoid checking all rules for each element
 #[derive(Debug, Clone)]
-struct IndexedCssRules<'a> {
+pub struct IndexedCssRules<'a> {
     /// Rules that match any element (universal selector *)
     universal: Vec<&'a CssRule>,
     /// Rules indexed by tag name (lowercase)
@@ -27,7 +27,7 @@ struct IndexedCssRules<'a> {
 }
 
 impl<'a> IndexedCssRules<'a> {
-    fn new(rules: &'a [&'a CssRule]) -> Self {
+    pub fn new(rules: &'a [&'a CssRule]) -> Self {
         let mut indexed = IndexedCssRules {
             universal: Vec::new(),
             by_tag: HashMap::new(),
@@ -172,7 +172,7 @@ fn filter_rules_by_properties<'a>(rules: &'a [&'a CssRule], target_props: &[Stri
 }
 
 /// Compute styles for a single ScrapedElement using indexed rules
-fn compute_styles_for_scraper_element<'a>(
+pub fn compute_styles_for_scraper_element<'a>(
     element: &ScrapedElement,
     indexed_rules: &IndexedCssRules<'a>,
     css_variables: &HashMap<String, String>,

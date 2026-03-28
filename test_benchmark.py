@@ -8,13 +8,12 @@ import time
 from pathlib import Path
 from collections import defaultdict
 import sys
-sys.path.insert(0, '/home/longcoding/dev/project/css_parser/.venv/lib/python3.12/site-packages')
 from playwright.async_api import async_playwright
 
 
 def rust_parse(html: str, enable_js: bool = False, filter_properties: list = None) -> dict:
-    import css_parser
-    result = css_parser.parse_html_and_compute_styles(html, enable_js, filter_properties)
+    import computed_css_engine
+    result = computed_css_engine.parse_html_and_compute_styles(html, enable_js, filter_properties)
     return json.loads(result)
 
 
