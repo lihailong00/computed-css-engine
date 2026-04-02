@@ -13,6 +13,7 @@ pub mod scraper_adapter;
 use pyo3::prelude::*;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use std::panic::AssertUnwindSafe;
 
 /// Represents an element's computed styles and matched rules
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -60,16 +61,37 @@ pub fn parse_html_and_write_styles(
     filter_properties: Option<Vec<String>>,
     write_to_attr: bool,
 ) -> String {
+    let html_preview: String = html.chars().take(200).collect();
     let filter_clone = filter_properties.clone();
-    match compute_styles(html, enable_js, filter_properties) {
-        Ok(result) => {
-            if write_to_attr {
-                write_styles_to_html_attr(html, &result.elements, filter_clone.as_deref())
-            } else {
-                serde_json::to_string(&result).unwrap_or_else(|e| e.to_string())
+
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        match compute_styles(html, enable_js, filter_properties) {
+            Ok(result) => {
+                if write_to_attr {
+                    write_styles_to_html_attr(html, &result.elements, filter_clone.as_deref())
+                } else {
+                    serde_json::to_string(&result).unwrap_or_else(|e| e.to_string())
+                }
             }
+            Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
         }
-        Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+    }));
+
+    match result {
+        Ok(output) => output,
+        Err(panic_info) => {
+            let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic".to_string()
+            };
+            serde_json::json!({
+                "error": format!("Panic: {}", msg),
+                "html_preview": html_preview
+            }).to_string()
+        }
     }
 }
 
@@ -254,9 +276,30 @@ pub fn parse_html_and_compute_styles(
     enable_js: bool,
     filter_properties: Option<Vec<String>>,
 ) -> String {
-    match compute_styles(html, enable_js, filter_properties) {
-        Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| e.to_string()),
-        Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+    let html_preview: String = html.chars().take(200).collect();
+
+    let result = std::panic::catch_unwind(AssertUnwindSafe(|| {
+        match compute_styles(html, enable_js, filter_properties) {
+            Ok(result) => serde_json::to_string(&result).unwrap_or_else(|e| e.to_string()),
+            Err(e) => serde_json::json!({"error": e.to_string()}).to_string(),
+        }
+    }));
+
+    match result {
+        Ok(output) => output,
+        Err(panic_info) => {
+            let msg = if let Some(s) = panic_info.downcast_ref::<&str>() {
+                s.to_string()
+            } else if let Some(s) = panic_info.downcast_ref::<String>() {
+                s.clone()
+            } else {
+                "Unknown panic".to_string()
+            };
+            serde_json::json!({
+                "error": format!("Panic: {}", msg),
+                "html_preview": html_preview
+            }).to_string()
+        }
     }
 }
 
